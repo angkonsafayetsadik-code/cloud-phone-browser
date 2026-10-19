@@ -193,75 +193,85 @@
     <button id="close-settings">Save & Close</button>
   </div>
 
-   
-  <script>
-  const urlInput = document.getElementById('urlInput');
+ <script>  
+  <!-- 1. Custom Popup Input Modal (Feature Phone Friendly) -->
+<div id="customPromptModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center;">
+  <div style="background:#222; padding:15px; width:90%; border-radius:8px; text-align:center; color:#fff;">
+    <p style="margin:0 0 10px 0; font-size:14px;">URL ba Search Query likhun:</p>
+    <input type="text" id="modalInputBox" style="width:100%; padding:10px; font-size:16px; background:#333; color:#fff; border:1px solid #555; border-radius:4px;" />
+    <p style="margin:10px 0 0 0; font-size:11px; color:#aaa;">OK / Enter chaple load hobe</p>
+  </div>
+</div>
 
+<script>
+  const urlInput = document.getElementById('urlInput');
+  const modal = document.getElementById('customPromptModal');
+  const modalInput = document.getElementById('modalInputBox');
+  let isModalOpen = false;
+
+  // Function to open Custom Prompt Box
+  function openCustomPrompt() {
+    isModalOpen = true;
+    modal.style.display = 'flex';
+    modalInput.value = urlInput.value || '';
+    modalInput.focus();
+  }
+
+  // Function to close and submit
+  function closeCustomPrompt(shouldNavigate = true) {
+    isModalOpen = false;
+    modal.style.display = 'none';
+    if (shouldNavigate && modalInput.value) {
+      urlInput.value = modalInput.value;
+      if (typeof navigate === 'function') {
+        navigate(modalInput.value);
+      }
+    }
+  }
+
+  // Original URL box click ba select korlei custom modal open hobe
   if (urlInput) {
-    urlInput.addEventListener('click', function() {
-      this.focus();
+    urlInput.addEventListener('click', function(e) {
+      openCustomPrompt();
+      e.preventDefault();
     });
   }
 
+  // Keypress / Navigation Handler
   document.addEventListener('keydown', (e) => {
-    // 1. If Input Box is focused, allow typing numbers & navigate on Enter/SoftLeft
-    if (document.activeElement === urlInput) {
-      if (e.key === 'Enter' || e.key === 'SoftLeft' || e.key === 'F1') {
-        urlInput.blur();
-        navigate(urlInput.value);
+    const key = e.key || e.keyCode;
+
+    // A. Jodi Modal Open thake, tahote modal-er bhitor input kaj korbe
+    if (isModalOpen) {
+      if (key === 'Enter' || key === 'SoftLeft' || key === 'F1' || key === 13) {
+        closeCustomPrompt(true);
+        e.preventDefault();
+      } else if (key === 'SoftRight' || key === 'Escape' || key === 'Backspace' && modalInput.value === '') {
+        closeCustomPrompt(false);
         e.preventDefault();
       }
-      return; 
+      return; // Allow typing inside modal
     }
 
-    // 2. Navigation & Keypad Scroll mapping when URL input is NOT focused
-    switch (e.key) {
-      case 'ArrowUp':
-        cursorY -= stepSize;
-        updateCursorPosition();
-        e.preventDefault();
-        break;
-      case 'ArrowDown':
-        cursorY += stepSize;
-        updateCursorPosition();
-        e.preventDefault();
-        break;
-      case 'ArrowLeft':
-        cursorX -= stepSize;
-        updateCursorPosition();
-        e.preventDefault();
-        break;
-      case 'ArrowRight':
-        cursorX += stepSize;
-        updateCursorPosition();
-        e.preventDefault();
-        break;
-      case 'Enter':
-      case 'SoftLeft':
-      case 'F1':
-      case 'Select':
-        if (cursorY <= 26) { 
-          urlInput.focus();
-        } else {
-          executeClick();
-        }
-        e.preventDefault();
-        break;
-      // Keypad Scrolling (2, 8, 4, 6)
-      case '2':
-        scrollPage('up');
-        break;
-      case '8':
-        scrollPage('down');
-        break;
-      case '4':
-        scrollPage('left');
-        break;
-      case '6':
-        scrollPage('right');
-        break;
+    // B. Normal Navigation & Keypad Scroll (2, 4, 8, 6)
+    if (key === '2' || key === '50') {
+      if (typeof scrollPage === 'function') scrollPage('up');
+    } else if (key === '8' || key === '56') {
+      if (typeof scrollPage === 'function') scrollPage('down');
+    } else if (key === '4' || key === '52') {
+      if (typeof scrollPage === 'function') scrollPage('left');
+    } else if (key === '6' || key === '54') {
+      if (typeof scrollPage === 'function') scrollPage('right');
+    } else if (key === 'Enter' || key === 'SoftLeft' || key === 'F1' || key === 'Select' || key === 13) {
+      // Jodi cursor upore (URL bar er kachakachi) thake, tahote modal open kore debe
+      if (typeof cursorY !== 'undefined' && cursorY <= 30) {
+        openCustomPrompt();
+      } else {
+        if (typeof executeClick === 'function') executeClick();
+      }
+      e.preventDefault();
     }
   });
-  </script>
+</script>
 </body>
 </html>
