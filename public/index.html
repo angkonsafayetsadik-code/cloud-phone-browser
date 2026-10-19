@@ -193,181 +193,75 @@
     <button id="close-settings">Save & Close</button>
   </div>
 
+   
   <script>
-    const VIEWPORT_WIDTH = 240;
-    const VIEWPORT_HEIGHT = 274;
-    
-    const TARGET_WIDTH = 320;
-    const TARGET_HEIGHT = 480;
+  const urlInput = document.getElementById('urlInput');
 
-    let cursorX = 120;
-    let cursorY = 137;
-    let stepSize = 10;
-    let isLoading = false;
+  if (urlInput) {
+    urlInput.addEventListener('click', function() {
+      this.focus();
+    });
+  }
 
-    const cursor = document.getElementById('virtual-cursor');
-    const screenImg = document.getElementById('render-screen');
-    const urlInput = document.getElementById('url-input');
-    const goBtn = document.getElementById('go-btn');
-    const settingsBtn = document.getElementById('settings-btn');
-    const settingsModal = document.getElementById('settings-modal');
-    const closeSettingsBtn = document.getElementById('close-settings');
-    const stepSizeSelect = document.getElementById('step-size-select');
-    const statusText = document.getElementById('status-text');
-    const coordsText = document.getElementById('coords-text');
-
-    function updateCursorPosition() {
-      cursorX = Math.max(0, Math.min(VIEWPORT_WIDTH, cursorX));
-      cursorY = Math.max(0, Math.min(VIEWPORT_HEIGHT, cursorY));
-
-      cursor.style.left = cursorX + 'px';
-      cursor.style.top = cursorY + 'px';
-      coordsText.innerText = `X:${cursorX} Y:${cursorY}`;
+  document.addEventListener('keydown', (e) => {
+    // 1. If Input Box is focused, allow typing numbers & navigate on Enter/SoftLeft
+    if (document.activeElement === urlInput) {
+      if (e.key === 'Enter' || e.key === 'SoftLeft' || e.key === 'F1') {
+        urlInput.blur();
+        navigate(urlInput.value);
+        e.preventDefault();
+      }
+      return; 
     }
 
-    function setStatus(msg) {
-      statusText.innerText = msg;
-    }
-
-    async function navigate(url) {
-      if (isLoading) return;
-      isLoading = true;
-      setStatus('Loading...');
-
-      try {
-        const res = await fetch('/api/navigate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          screenImg.src = 'data:image/jpeg;base64,' + data.screenshot;
-          urlInput.value = data.url;
-          setStatus('Ready');
+    // 2. Navigation & Keypad Scroll mapping when URL input is NOT focused
+    switch (e.key) {
+      case 'ArrowUp':
+        cursorY -= stepSize;
+        updateCursorPosition();
+        e.preventDefault();
+        break;
+      case 'ArrowDown':
+        cursorY += stepSize;
+        updateCursorPosition();
+        e.preventDefault();
+        break;
+      case 'ArrowLeft':
+        cursorX -= stepSize;
+        updateCursorPosition();
+        e.preventDefault();
+        break;
+      case 'ArrowRight':
+        cursorX += stepSize;
+        updateCursorPosition();
+        e.preventDefault();
+        break;
+      case 'Enter':
+      case 'SoftLeft':
+      case 'F1':
+      case 'Select':
+        if (cursorY <= 26) { 
+          urlInput.focus();
         } else {
-          setStatus('Error: ' + data.error);
-        }
-      } catch (err) {
-        setStatus('Network Error');
-      } finally {
-        isLoading = false;
-      }
-    }
-
-    async function executeClick() {
-      if (isLoading) return;
-
-      const targetX = Math.round((cursorX / VIEWPORT_WIDTH) * TARGET_WIDTH);
-      const targetY = Math.round((cursorY / VIEWPORT_HEIGHT) * TARGET_HEIGHT);
-
-      isLoading = true;
-      setStatus('Clicking...');
-
-      try {
-        const res = await fetch('/api/click', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ x: targetX, y: targetY })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          screenImg.src = 'data:image/jpeg;base64,' + data.screenshot;
-          if (data.url) urlInput.value = data.url;
-          setStatus('Ready');
-        } else {
-          setStatus('Click Error');
-        }
-      } catch (err) {
-        setStatus('Network Error');
-      } finally {
-        isLoading = false;
-      }
-    }
-
-    async function scrollPage(direction) {
-      if (isLoading) return;
-      isLoading = true;
-      setStatus('Scrolling...');
-
-      try {
-        const res = await fetch('/api/scroll', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ direction })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          screenImg.src = 'data:image/jpeg;base64,' + data.screenshot;
-          setStatus('Ready');
-        }
-      } catch (err) {
-        setStatus('Scroll Error');
-      } finally {
-        isLoading = false;
-      }
-    }
-
-    document.addEventListener('keydown', (e) => {
-      if (document.activeElement === urlInput) {
-        if (e.key === 'Enter') {
-          urlInput.blur();
-          navigate(urlInput.value);
-        }
-        return;
-      }
-
-      switch (e.key) {
-        case 'ArrowUp':
-          cursorY -= stepSize;
-          updateCursorPosition();
-          e.preventDefault();
-          break;
-        case 'ArrowDown':
-          cursorY += stepSize;
-          updateCursorPosition();
-          e.preventDefault();
-          break;
-        case 'ArrowLeft':
-          cursorX -= stepSize;
-          updateCursorPosition();
-          e.preventDefault();
-          break;
-        case 'ArrowRight':
-          cursorX += stepSize;
-          updateCursorPosition();
-          e.preventDefault();
-          break;
-        case 'Enter':
-        case 'Select':
           executeClick();
-          e.preventDefault();
-          break;
-        case '2':
-          scrollPage('up');
-          break;
-        case '8':
-          scrollPage('down');
-          break;
-      }
-    });
-
-    goBtn.addEventListener('click', () => navigate(urlInput.value));
-
-    settingsBtn.addEventListener('click', () => {
-      settingsModal.style.display = 'block';
-    });
-
-    closeSettingsBtn.addEventListener('click', () => {
-      stepSize = parseInt(stepSizeSelect.value, 10);
-      settingsModal.style.display = 'none';
-    });
-
-    updateCursorPosition();
-    navigate(urlInput.value);
+        }
+        e.preventDefault();
+        break;
+      // Keypad Scrolling (2, 8, 4, 6)
+      case '2':
+        scrollPage('up');
+        break;
+      case '8':
+        scrollPage('down');
+        break;
+      case '4':
+        scrollPage('left');
+        break;
+      case '6':
+        scrollPage('right');
+        break;
+    }
+  });
   </script>
 </body>
 </html>
