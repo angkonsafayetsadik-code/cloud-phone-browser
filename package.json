@@ -1,0 +1,13 @@
+{
+  "name": "cloud-feature-phone-browser",
+  "version": "1.0.0",
+  "description": "Server-side rendered proxy browser with virtual cursor for 240x320 feature phones",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "puppeteer": "^22.6.0"
+  }
+}
