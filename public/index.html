@@ -1,277 +1,87 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=240, height=320, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cloud Phone Browser</title>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: sans-serif;
-      font-size: 11px;
-    }
-
-    body {
-      width: 240px;
-      height: 320px;
-      background: #000;
-      color: #fff;
-      overflow: hidden;
-      position: relative;
-    }
-
-    #url-bar {
-      width: 240px;
-      height: 26px;
-      background: #1f1f1f;
-      display: flex;
-      align-items: center;
-      padding: 2px 4px;
-      border-bottom: 1px solid #333;
-      position: absolute;
-      top: 0;
-      left: 0;
-      z-index: 100;
-    }
-
-    #url-input {
-      width: 170px;
-      height: 20px;
+    /* Feature Phone Optimized Layout */
+    body { margin: 0; padding: 0; background: #111; color: #fff; font-family: sans-serif; overflow: hidden; }
+    #bar { display: flex; background: #222; padding: 5px; align-items: center; }
+    
+    /* Input Field that Triggers Proton Jet Native Text Dialog */
+    #urlInput {
+      flex: 1;
+      padding: 8px;
+      font-size: 16px;
       background: #333;
       color: #fff;
       border: 1px solid #555;
-      padding: 0 4px;
+      border-radius: 4px;
       outline: none;
-      font-size: 10px;
-    }
-
-    #go-btn, #settings-btn {
-      height: 20px;
-      background: #007acc;
-      color: #fff;
-      border: none;
-      padding: 0 6px;
-      margin-left: 2px;
-      cursor: pointer;
-      font-size: 10px;
-    }
-
-    #settings-btn {
-      background: #444;
-    }
-
-    #viewport-container {
-      width: 240px;
-      height: 274px;
-      position: absolute;
-      top: 26px;
-      left: 0;
-      background: #111;
-      overflow: hidden;
-    }
-
-    #render-screen {
-      width: 100%;
-      height: 100%;
-      object-fit: fill;
-      display: block;
-    }
-
-    #virtual-cursor {
-      width: 10px;
-      height: 10px;
-      position: absolute;
-      top: 137px;
-      left: 120px;
-      z-index: 200;
-      pointer-events: none;
-    }
-
-    #virtual-cursor::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 0;
-      height: 0;
-      border-left: 8px solid red;
-      border-right: 4px solid transparent;
-      border-bottom: 8px solid transparent;
-    }
-
-    #status-bar {
-      width: 240px;
-      height: 20px;
-      background: #111;
-      color: #aaa;
-      font-size: 9px;
-      line-height: 20px;
-      padding: 0 4px;
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      border-top: 1px solid #222;
-      display: flex;
-      justify-content: space-between;
-      z-index: 100;
-    }
-
-    #settings-modal {
-      display: none;
-      position: absolute;
-      top: 26px;
-      left: 0;
-      width: 240px;
-      height: 274px;
-      background: rgba(0, 0, 0, 0.9);
-      z-index: 300;
-      padding: 10px;
-      box-sizing: border-box;
-    }
-
-    #settings-modal h4 {
-      margin-bottom: 10px;
-      color: #007acc;
-    }
-
-    .setting-item {
-      margin-bottom: 10px;
-    }
-
-    .setting-item label {
-      display: block;
-      margin-bottom: 4px;
-    }
-
-    .setting-item select {
-      width: 100%;
-      background: #222;
-      color: #fff;
-      border: 1px solid #444;
-      padding: 4px;
-    }
-
-    #close-settings {
-      background: #d9534f;
-      color: white;
-      border: none;
-      padding: 4px 8px;
-      margin-top: 10px;
     }
   </style>
 </head>
 <body>
 
-  <div id="url-bar">
-    <input type="text" id="url-input" placeholder="Enter URL..." value="https://google.com" />
-    <button id="go-btn">Go</button>
-    <button id="settings-btn">⚙</button>
+  <div id="bar">
+    <!-- tabindex and inputmode force Proton Jet 4G to open system keypad dialog -->
+    <input 
+      type="text" 
+      id="urlInput" 
+      placeholder="Enter URL or Search..." 
+      tabindex="1"
+      inputmode="text"
+    />
   </div>
 
-  <div id="viewport-container">
-    <img id="render-screen" alt="Web View" />
-    <div id="virtual-cursor"></div>
+  <div id="viewport" style="position:relative; width:100vw; height:calc(100vh - 45px); overflow:hidden;">
+    <img id="screen" style="width:100%; height:100%; object-fit:contain;" />
   </div>
 
-  <div id="status-bar">
-    <span id="status-text">Ready</span>
-    <span id="coords-text">X:120 Y:137</span>
-  </div>
+  <script>
+    const urlInput = document.getElementById('urlInput');
 
-  <div id="settings-modal">
-    <h4>Settings</h4>
-    <div class="setting-item">
-      <label for="step-size-select">Cursor Step Size (px):</label>
-      <select id="step-size-select">
-        <option value="5">5 px (Precise)</option>
-        <option value="10" selected>10 px (Normal)</option>
-        <option value="20">20 px (Fast)</option>
-      </select>
-    </div>
-    <button id="close-settings">Save & Close</button>
-  </div>
-
- <script>  
-  <!-- 1. Custom Popup Input Modal (Feature Phone Friendly) -->
-<div id="customPromptModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center;">
-  <div style="background:#222; padding:15px; width:90%; border-radius:8px; text-align:center; color:#fff;">
-    <p style="margin:0 0 10px 0; font-size:14px;">URL ba Search Query likhun:</p>
-    <input type="text" id="modalInputBox" style="width:100%; padding:10px; font-size:16px; background:#333; color:#fff; border:1px solid #555; border-radius:4px;" />
-    <p style="margin:10px 0 0 0; font-size:11px; color:#aaa;">OK / Enter chaple load hobe</p>
-  </div>
-</div>
-
-<script>
-  const urlInput = document.getElementById('urlInput');
-  const modal = document.getElementById('customPromptModal');
-  const modalInput = document.getElementById('modalInputBox');
-  let isModalOpen = false;
-
-  // Function to open Custom Prompt Box
-  function openCustomPrompt() {
-    isModalOpen = true;
-    modal.style.display = 'flex';
-    modalInput.value = urlInput.value || '';
-    modalInput.focus();
-  }
-
-  // Function to close and submit
-  function closeCustomPrompt(shouldNavigate = true) {
-    isModalOpen = false;
-    modal.style.display = 'none';
-    if (shouldNavigate && modalInput.value) {
-      urlInput.value = modalInput.value;
-      if (typeof navigate === 'function') {
-        navigate(modalInput.value);
+    // 1. Trigger Native System Keyboard Dialog on Click/Focus
+    function triggerSystemInput() {
+      // Proton Jet / KaiOS browsers open the native Text Prompt via standard prompt or direct focus
+      const userInput = prompt("Enter URL or Search:", urlInput.value || "");
+      if (userInput !== null && userInput.trim() !== "") {
+        urlInput.value = userInput;
+        if (typeof navigate === 'function') {
+          navigate(userInput);
+        }
       }
     }
-  }
 
-  // Original URL box click ba select korlei custom modal open hobe
-  if (urlInput) {
-    urlInput.addEventListener('click', function(e) {
-      openCustomPrompt();
-      e.preventDefault();
+    if (urlInput) {
+      urlInput.addEventListener('click', triggerSystemInput);
+    }
+
+    // 2. Physical Keypad Listener for 2, 4, 8, 6 Scrolling & Soft Keys
+    document.addEventListener('keydown', (e) => {
+      const key = e.key || e.keyCode;
+
+      // Top Left Key / OK Key on top URL Bar -> Opens System Text Dialog
+      if (key === 'Enter' || key === 'SoftLeft' || key === 'F1' || key === 'Select' || key === 13) {
+        if (document.activeElement === urlInput || (typeof cursorY !== 'undefined' && cursorY <= 30)) {
+          triggerSystemInput();
+          e.preventDefault();
+        } else {
+          if (typeof executeClick === 'function') executeClick();
+        }
+      } 
+      // Numeric Keypad Scroll (When typing dialog is closed)
+      else if (key === '2' || key === '50') {
+        if (typeof scrollPage === 'function') scrollPage('up');
+      } else if (key === '8' || key === '56') {
+        if (typeof scrollPage === 'function') scrollPage('down');
+      } else if (key === '4' || key === '52') {
+        if (typeof scrollPage === 'function') scrollPage('left');
+      } else if (key === '6' || key === '54') {
+        if (typeof scrollPage === 'function') scrollPage('right');
+      }
     });
-  }
-
-  // Keypress / Navigation Handler
-  document.addEventListener('keydown', (e) => {
-    const key = e.key || e.keyCode;
-
-    // A. Jodi Modal Open thake, tahote modal-er bhitor input kaj korbe
-    if (isModalOpen) {
-      if (key === 'Enter' || key === 'SoftLeft' || key === 'F1' || key === 13) {
-        closeCustomPrompt(true);
-        e.preventDefault();
-      } else if (key === 'SoftRight' || key === 'Escape' || key === 'Backspace' && modalInput.value === '') {
-        closeCustomPrompt(false);
-        e.preventDefault();
-      }
-      return; // Allow typing inside modal
-    }
-
-    // B. Normal Navigation & Keypad Scroll (2, 4, 8, 6)
-    if (key === '2' || key === '50') {
-      if (typeof scrollPage === 'function') scrollPage('up');
-    } else if (key === '8' || key === '56') {
-      if (typeof scrollPage === 'function') scrollPage('down');
-    } else if (key === '4' || key === '52') {
-      if (typeof scrollPage === 'function') scrollPage('left');
-    } else if (key === '6' || key === '54') {
-      if (typeof scrollPage === 'function') scrollPage('right');
-    } else if (key === 'Enter' || key === 'SoftLeft' || key === 'F1' || key === 'Select' || key === 13) {
-      // Jodi cursor upore (URL bar er kachakachi) thake, tahote modal open kore debe
-      if (typeof cursorY !== 'undefined' && cursorY <= 30) {
-        openCustomPrompt();
-      } else {
-        if (typeof executeClick === 'function') executeClick();
-      }
-      e.preventDefault();
-    }
-  });
-</script>
+  </script>
 </body>
 </html>
