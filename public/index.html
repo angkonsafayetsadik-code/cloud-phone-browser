@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=240, height=320, initial-scale=1.0, user-scalable=no">
+  <title>Cloud Phone Browser</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      font-size: 11px;
+    }
+
+    body {
+      width: 240px;
+      height: 320px;
+      background: #000;
+      color: #fff;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #url-bar {
+      width: 240px;
+      height: 26px;
+      background: #1f1f1f;
+      display: flex;
+      align-items: center;
+      padding: 2px 4px;
+      border-bottom: 1px solid #333;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 100;
+    }
+
+    #url-input {
+      width: 170px;
+      height: 20px;
+      background: #333;
+      color: #fff;
+      border: 1px solid #555;
+      padding: 0 4px;
+      outline: none;
+      font-size: 10px;
+    }
+
+    #go-btn, #settings-btn {
+      height: 20px;
+      background: #007acc;
+      color: #fff;
+      border: none;
+      padding: 0 6px;
+      margin-left: 2px;
+      cursor: pointer;
+      font-size: 10px;
+    }
+
+    #settings-btn {
+      background: #444;
+    }
+
+    #viewport-container {
+      width: 240px;
+      height: 274px;
+      position: absolute;
+      top: 26px;
+      left: 0;
+      background: #111;
+      overflow: hidden;
+    }
+
+    #render-screen {
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      display: block;
+    }
+
+    #virtual-cursor {
+      width: 10px;
+      height: 10px;
+      position: absolute;
+      top: 137px;
+      left: 120px;
+      z-index: 200;
+      pointer-events: none;
+    }
+
+    #virtual-cursor::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 0;
+      border-left: 8px solid red;
+      border-right: 4px solid transparent;
+      border-bottom: 8px solid transparent;
+    }
+
+    #status-bar {
+      width: 240px;
+      height: 20px;
+      background: #111;
+      color: #aaa;
+      font-size: 9px;
+      line-height: 20px;
+      padding: 0 4px;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      border-top: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      z-index: 100;
+    }
+
+    #settings-modal {
+      display: none;
+      position: absolute;
+      top: 26px;
+      left: 0;
+      width: 240px;
+      height: 274px;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 300;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    #settings-modal h4 {
+      margin-bottom: 10px;
+      color: #007acc;
+    }
+
+    .setting-item {
+      margin-bottom: 10px;
+    }
+
+    .setting-item label {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .setting-item select {
+      width: 100%;
+      background: #222;
+      color: #fff;
+      border: 1px solid #444;
+      padding: 4px;
+    }
+
+    #close-settings {
+      background: #d9534f;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="url-bar">
+    <input type="text" id="url-input" placeholder="Enter URL..." value="https://google.com" />
+    <button id="go-btn">Go</button>
+    <button id="settings-btn">⚙</button>
+  </div>
+
+  <div id="viewport-container">
+    <img id="render-screen" alt="Web View" />
+    <div id="virtual-cursor"></div>
+  </div>
+
+  <div id="status-bar">
+    <span id="status-text">Ready</span>
+    <span id="coords-text">X:120 Y:137</span>
+  </div>
+
+  <div id="settings-modal">
+    <h4>Settings</h4>
+    <div class="setting-item">
+      <label for="step-size-select">Cursor Step Size (px):</label>
+      <select id="step-size-select">
+        <option value="5">5 px (Precise)</option>
+        <option value="10" selected>10 px (Normal)</option>
+        <option value="20">20 px (Fast)</option>
+      </select>
+    </div>
+    <button id="close-settings">Save & Close</button>
+  </div>
+
+  <script>
+    const VIEWPORT_WIDTH = 240;
+    const VIEWPORT_HEIGHT = 274;
+    
+    const TARGET_WIDTH = 320;
+    const TARGET_HEIGHT = 480;
+
+    let cursorX = 120;
+    let cursorY = 137;
+    let stepSize = 10;
+    let isLoading = false;
+
+    const cursor = document.getElementById('virtual-cursor');
+    const screenImg = document.getElementById('render-screen');
+    const urlInput = document.getElementById('url-input');
+    const goBtn = document.getElementById('go-btn');
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsModal = document.getElementById('settings-modal');
+    const closeSettingsBtn = document.getElementById('close-settings');
+    const stepSizeSelect = document.getElementById('step-size-select');
+    const statusText = document.getElementById('status-text');
+    const coordsText = document.getElementById('coords-text');
+
+    function updateCursorPosition() {
+      cursorX = Math.max(0, Math.min(VIEWPORT_WIDTH, cursorX));
+      cursorY = Math.max(0, Math.min(VIEWPORT_HEIGHT, cursorY));
+
+      cursor.style.left = cursorX + 'px';
+      cursor.style.top = cursorY + 'px';
+      coordsText.innerText = `X:${cursorX} Y:${cursorY}`;
+    }
+
+    function setStatus(msg) {
+      statusText.innerText = msg;
+    }
+
+    async function navigate(url) {
+      if (isLoading) return;
+      isLoading = true;
+      setStatus('Loading...');
+
+      try {
+        const res = await fetch('/api/navigate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          screenImg.src = 'data:image/jpeg;base64,' + data.screenshot;
+          urlInput.value = data.url;
+          setStatus('Ready');
+        } else {
+          setStatus('Error: ' + data.error);
+        }
+      } catch (err) {
+        setStatus('Network Error');
+      } finally {
+        isLoading = false;
+      }
+    }
+
+    async function executeClick() {
+      if (isLoading) return;
+
+      const targetX = Math.round((cursorX / VIEWPORT_WIDTH) * TARGET_WIDTH);
+      const targetY = Math.round((cursorY / VIEWPORT_HEIGHT) * TARGET_HEIGHT);
+
+      isLoading = true;
+      setStatus('Clicking...');
+
+      try {
+        const res = await fetch('/api/click', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x: targetX, y: targetY })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          screenImg.src = 'data:image/jpeg;base64,' + data.screenshot;
+          if (data.url) urlInput.value = data.url;
+          setStatus('Ready');
+        } else {
+          setStatus('Click Error');
+        }
+      } catch (err) {
+        setStatus('Network Error');
+      } finally {
+        isLoading = false;
+      }
+    }
+
+    async function scrollPage(direction) {
+      if (isLoading) return;
+      isLoading = true;
+      setStatus('Scrolling...');
+
+      try {
+        const res = await fetch('/api/scroll', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ direction })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          screenImg.src = 'data:image/jpeg;base64,' + data.screenshot;
+          setStatus('Ready');
+        }
+      } catch (err) {
+        setStatus('Scroll Error');
+      } finally {
+        isLoading = false;
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (document.activeElement === urlInput) {
+        if (e.key === 'Enter') {
+          urlInput.blur();
+          navigate(urlInput.value);
+        }
+        return;
+      }
+
+      switch (e.key) {
+        case 'ArrowUp':
+          cursorY -= stepSize;
+          updateCursorPosition();
+          e.preventDefault();
+          break;
+        case 'ArrowDown':
+          cursorY += stepSize;
+          updateCursorPosition();
+          e.preventDefault();
+          break;
+        case 'ArrowLeft':
+          cursorX -= stepSize;
+          updateCursorPosition();
+          e.preventDefault();
+          break;
+        case 'ArrowRight':
+          cursorX += stepSize;
+          updateCursorPosition();
+          e.preventDefault();
+          break;
+        case 'Enter':
+        case 'Select':
+          executeClick();
+          e.preventDefault();
+          break;
+        case '2':
+          scrollPage('up');
+          break;
+        case '8':
+          scrollPage('down');
+          break;
+      }
+    });
+
+    goBtn.addEventListener('click', () => navigate(urlInput.value));
+
+    settingsBtn.addEventListener('click', () => {
+      settingsModal.style.display = 'block';
+    });
+
+    closeSettingsBtn.addEventListener('click', () => {
+      stepSize = parseInt(stepSizeSelect.value, 10);
+      settingsModal.style.display = 'none';
+    });
+
+    updateCursorPosition();
+    navigate(urlInput.value);
+  </script>
+</body>
+</html>
